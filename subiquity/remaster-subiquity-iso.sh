@@ -10,23 +10,43 @@ mkdir -p ${work_dir}
 iso_tmp="$(mktemp -d -p ${work_dir})"
 iso_file=$(basename ${iso_url})
 
+###################################################
 # fetch the iso, using wget, because we can resume
-wget -c "${iso_url}" -q --show-progress -P "${work_dir}"
+function fetch_iso() {
+  wget -N -c "${iso_url}" -q --show-progress -P "${work_dir}"
+  exit_status=$?; 
 
+  if [[ $exit_status == 0 ]]; then
+    echo "File fully downloded, continuing... "
+    validate_iso
+  elif [[ $exit_status == 1 ]]; then
+    echo "Partial file or missing, downloading now... "
+  fi
+}
+
+###################################################
 # Check the SHA256SUM before continuing, bail out if exit 1
-echo -n "Checking integrity of the downloaded iso image... "
-grep "${iso_file}" <(wget -q "${sha_url}" -O -) | sha256sum --check
+function validate_iso() {
+  cd "${work_dir}" || exit
+  echo -n "Checking integrity of the downloaded iso image... "
+  grep "${iso_file}" <(wget -q "${sha_url}" -O -) | sha256sum --check
+}
 
-sudo mount -oloop "${work_dir}/${iso_file}" "${iso_tmp}"
+###################################################
+# Mount and unpack the squashfs so we can alter it
+function unpack_iso() {
+  sudo mount -oloop "${work_dir}/${iso_file}" "${iso_tmp}"
+  echo "Image is now mounted at ${iso_tmp} ..."
+  squash_tmp_dir=$(mktemp -d -p ${work_dir})
+  squash_out_dir=$(mktemp -d -p ${work_dir})
+  echo "Unpacking 'filesystem.squashfs' into ${squash_tmp_dir} to inject 'answers.yaml' "
+  sudo unsquashfs -f -d "${squash_tmp_dir}" "${iso_tmp}"/casper/filesystem.squashfs
+  sudo mkdir -p "${squash_tmp_dir}"/subiquity_config
+}
 
-echo "Image is now mounted at ${iso_tmp} ..."
-
-squash_tmp_dir=$(mktemp -d -p ${work_dir})
-squash_out_dir=$(mktemp -d -p ${work_dir})
-echo "Unpacking 'filesystem.squashfs' into ${squash_tmp_dir} to inject 'answers.yaml' "
-sudo unsquashfs -f -d "${squash_tmp_dir}" "${iso_tmp}"/casper/filesystem.squashfs
-sudo mkdir -p "${squash_tmp_dir}"/subiquity_config
-
+###################################################
+# Add the 'answers.yaml' to the internal squashfs 
+function inject_answers() {
 # shellcheck disable=SC2154,SC1037
 sudo tee "${squash_tmp_dir}"/subiquity_config/answers.yaml << EOF 
 Welcome:
@@ -64,21 +84,30 @@ InstallProgress:
   reboot: yes
 EOF
 
-# sudo cp "${work_dir}"/answers.yaml "${squash_tmp_dir}"/subiquity_config
-sudo mksquashfs "${squash_tmp_dir}" "${squash_out_dir}"/filesystem.squashfs
+  # sudo cp "${work_dir}"/answers.yaml "${squash_tmp_dir}"/subiquity_config
+  sudo mksquashfs "${squash_tmp_dir}" "${squash_out_dir}"/filesystem.squashfs
 
-# This is better handled as an overlay unionfs/aufs mount, vs. rsync'ing data around
-sudo rsync -aqP --inplace --partial "${iso_tmp}"/. "${work_dir}"/final/
-sudo rsync -aqP --inplace --partial "${squash_out_dir}"/filesystem.squashfs "${work_dir}"/final/casper/
+  # This is better handled as an overlay unionfs/aufs mount, vs. rsync'ing data around
+  sudo rsync -aqP --inplace --partial "${iso_tmp}"/. "${work_dir}"/final/
+  sudo rsync -aqP --inplace --partial "${squash_out_dir}"/filesystem.squashfs "${work_dir}"/final/casper/
+}
 
-# Cleanup
-sudo rm -rf "${squash_tmp_dir}"
-sudo umount "${iso_tmp}"
-sudo rm -rf "${iso_tmp}" "${squash_out_dir}"
+###################################################
+# Remove our temporary work dirs
+function cleanup() {
+  sudo rm -rf "${squash_tmp_dir}"
+  sudo umount "${iso_tmp}"
+  sudo rm -rf "${iso_tmp}" "${squash_out_dir}"
 
-iso_opts="$(xorriso -indev "${iso_file}" -report_el_torito as_mkisofs)"
-# shellcheck disable=SC2086
-eval set -- ${iso_opts}
-xorriso -as mkisofs "$@" -o ${work_dir}/subiquity-remaster-"$(date +%Y-%m-%d)".iso -V 'Subiquity Remaster' "${work_dir}"/final
+  iso_opts="$(xorriso -indev "${iso_file}" -report_el_torito as_mkisofs)"
+  # shellcheck disable=SC2086
+  eval set -- ${iso_opts}
+  xorriso -as mkisofs "$@" -o ${work_dir}/subiquity-remaster-"$(date +%Y-%m-%d)".iso -V 'Subiquity Remaster' "${work_dir}"/final
 
-sudo rm -rf "${work_dir}"/final
+  sudo rm -rf "${work_dir}"/final
+}
+
+fetch_iso
+unpack_iso
+inject_answers
+cleanup "$@" 
