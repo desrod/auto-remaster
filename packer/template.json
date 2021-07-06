@@ -1,0 +1,39 @@
+{
+  "builders": [{
+    "type": "qemu",
+    "cpus": 2,
+    "memory": 8192,
+    "name": "ubuntu-packer-reproducer",
+    "boot_command": [
+      "<enter> "
+    ],
+    "iso_urls": [
+      "iso/subiquity-remaster-2021-07-06.iso"
+    ],
+    "iso_checksum": "c7deed099994395380938cbcf475a11d9c8139382543a53dbc7fadb298c25929",
+    "communicator": "ssh",
+    "ssh_username": "ubuntu",
+    "ssh_password": "ubuntu",
+    "ssh_timeout": "30m",
+    "ssh_handshake_attempts": "200",
+    "ssh_pty": true,
+    "shutdown_command": "echo {{user `ssh_password`}} | sudo -S -E shutdown -P now",
+    "accelerator" : "kvm",
+    "format": "qcow2",
+    "qemuargs": [
+      ["-serial", "stdio"],
+      ["-display", "gtk"]
+    ],
+    "disk_compression" : "true",
+    "disk_interface" : "virtio",
+    "boot_wait": "3s",
+    "disk_size": "6G",
+    "headless": false,
+    "net_device": "virtio-net",
+    "machine_type" : "q35",
+    "vnc_bind_address" : "0.0.0.0",
+    "output_directory": "/tmp/packer/output",
+    "http_directory": "http",
+    "shutdown_timeout": "45m"
+    }]
+}

@@ -1,0 +1,75 @@
+d-i debian-installer/locale string en_US.UTF-8
+d-i debian-installer/language string en
+d-i debian-installer/country string US
+
+d-i grub-installer/only_debian boolean true
+d-i grub-installer/timeout string 1
+
+d-i passwd/user-fullname string Ubuntu User
+d-i passwd/username string ubuntu
+d-i passwd/user-password-crypted password $6$FSQDCW1k$8Yk/0tttvOkFIHXbfPRiPgyckRvoGw9irqbjCkuw9XkPS/F26R9KSfjR6gpZgpyGhT09zD3yYNS7PGY4egU3/.
+d-i user-setup/encrypt-home boolean false
+d-i time/zone string US/Eastern
+
+d-i preseed/early_command string umount /media
+d-i partman-efi/non_efi_system boolean true
+d-i partman-auto/disk string /dev/mmcblk0
+# d-i partman-auto/disk string /dev/sda
+d-i partman-auto/method string lvm
+d-i partman-lvm/device_remove_lvm boolean true
+d-i partman-lvm/confirm boolean true
+d-i partman-lvm/confirm_nooverwrite boolean true
+d-i partman-auto-lvm/guided_size string max
+d-i partman-partitioning/confirm_write_new_label boolean true
+d-i partman/choose_partition select finish
+d-i partman/confirm boolean true
+d-i partman/confirm_nooverwrite boolean true
+
+d-i netcfg/disable_autoconfig boolean true
+d-i netcfg/get_nameservers string 192.168.4.1
+d-i netcfg/get_ipaddress string 192.168.4.214
+d-i netcfg/get_netmask string 255.255.255.0
+d-i netcfg/get_gateway string 192.168.4.1
+d-i netcfg/confirm_static boolean true
+
+# d-i netcfg/choose_interface select auto
+d-i netcfg/get_hostname string lego-one
+d-i netcfg/get_domain string gnu-designs.com
+d-i mirror/country string manual
+
+
+
+d-i mirror/country string manual
+d-i mirror/http/hostname string archive.ubuntu.com
+d-i mirror/http/directory string /ubuntu
+d-i mirror/http/proxy string
+
+d-i passwd/root-login boolean false
+
+d-i mirror/http/proxy string
+d-i apt-setup/security_host string archive.ubuntu.com
+popularity-contest popularity-contest/participate boolean false
+d-i pkgsel/updatedb boolean false
+d-i finish-install/reboot_in_progress note
+d-i debian-installer/exit/halt boolean true
+d-i base-installer/kernel/headers boolean false
+tasksel tasksel/first multiselect minimal
+d-i pkgsel/include string openssh-server build-essential software-properties-common
+d-i pkgsel/upgrade select none
+d-i pkgsel/update-policy select none
+d-i pkgsel/language-pack-patterns string
+d-i pkgsel/install-language-support boolean false
+d-i clock-setup/utc-auto boolean true
+d-i debian-installer/quiet boolean false
+d-i debian-installer/splash boolean false
+d-i base-installer/kernel/altmeta string lts-trusty
+
+d-i preseed/late_command string \
+  in-target rm -rf /var/lib/apt/lists ; \
+  in-target apt-get update ; \
+  in-target apt-get -y upgrade ; \
+  in-target apt-get -y dist-upgrade ; \
+  in-target apt-get -y autoremove ; \
+  in-target apt-get autoclean ; \
+  in-target apt-get clean
+
